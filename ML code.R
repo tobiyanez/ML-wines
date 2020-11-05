@@ -1,25 +1,30 @@
 library(tree) #to fit trees
 library(randomForest) #for random forests (and bagging)
 library(gbm) #for boosting
-library(ISLR)
-library(ggplot2)
-library(ROCR)
+library(ggplot2) #for any graphics we may create
+library(ROCR) #for plots
 library(boot) #for cv.glm function
 library(MASS) #for lda function
-library(ipred)
+library(ipred) #for cv/bagging/etc. functions
+library(car)
 
 red <- read.csv("wineQualityReds.csv",header=T)
 white <- read.csv("wineQualityWhites.csv",header=T)
 
 red$type <- c("Red")
 white$type <- c("White")
-alldata <- rbind(red,white)
-alldata$type <- ifelse(alldata$type=="White", 1,0)
-head(alldata) # quick look at total data set
+data <- rbind(red,white)
+data$type <- ifelse(data$type=="White", 1,0)
+head(data) # quick look at total data set
 
 #seeing what pairs look to be generally correlated
-pairs(alldata[,2:13], lower.panel = NULL, main="Scatterplot of Quantitative Variables")
-round(cor(alldata[,2:13]),3)
+
+pairs(data[,2:13``], lower.panel = NULL, main="Scatterplot of Quantitative Variables")
+round(cor(data[,2:13]),3)
+
+ggplot(data = data) + 
+  geom_boxplot(mapping = aes(x = quality_cat, y = volatile.acidity)) + theme_classic()
+
 #density, sugar, and alcohol all correlated
 #makes sense chemically
 
@@ -27,17 +32,22 @@ round(cor(alldata[,2:13]),3)
 #establishing quality variable to measure if wine is above or below median quality
 test <- function(x) {
   ifelse(
-    x<median(alldata$quality),
+    x<median(data$quality),
     0,
     1
   )}
-alldata$quality_cat <- factor(test(alldata$quality))
-data<-alldata
+data$quality_cat <- factor(test(data$quality))
+data$X <- NULL
+View(data)
 
+
+#setting RNG to match newer R versions
 #creating a training data set and a testing data set to determine
 #how well the model works
-RNGkind(sample.kind = "Rejection")
+RNGkind(sample.kind = "Rejection") #in order to match newer R RNG
+                                   #New R uses rejection not rounding
 set.seed(1)
+
 sample.data<-sample.int(nrow(data), floor(.50*nrow(data)), replace = F)
 train<-data[sample.data, ]
 test<-data[-sample.data, ]
@@ -133,6 +143,35 @@ mean((pred.rf - test.y)^2)
 #################################################
 ## Classification ##
 #################################################
+LogisticRegression <- glm(quality_cat ~ .-quality, data = train, family = "binomial")
+summary(LogisticRegression)
+vif(LogisticRegression)
+data$density <- NULL
+
+LogTest<-round(predict(LogisticRegression, newdata=test, type="response")) 
+table(test.y, LogTest)
+mean(LogTest != test.y)
+
+par(mfrow=c(2,2))
+plot(LogisticRegression)
+
+
+mod <- glm(quality_cat ~ .-quality, data = train, family = "binomial")
+cooksd <- cooks.distance(mod)
+plot(cooksd, pch="*", cex=2, main="Influential Obs by Cooks distance")  # plot cook's distance
+abline(h = 4*mean(cooksd, na.rm=T), col="red")  # add cutoff line
+text(x=1:length(cooksd)+1, y=cooksd, labels=ifelse(cooksd>4*mean(cooksd, na.rm=T),names(cooksd),""), col="red")  # add labels
+
+
+
+RNGkind(sample.kind = "Rejection") #in order to match newer R RNG
+#New R uses rejection not rounding
+set.seed(1)
+
+sample.data<-sample.int(nrow(data), floor(.50*nrow(data)), replace = F)
+train<-data[sample.data, ]
+test<-data[-sample.data, ]
+
 
 #this time predicting for the quality of the wine
 #strating off again with a simple regression and classification tree
@@ -149,7 +188,6 @@ tree.pred.test<-predict(tree.class.train, newdata=test, type="class")
 table(test.y, tree.pred.test)
 mean(tree.pred.test != test.y)
 # test mse of .274 for basic tree
-
 
 #using cross validation and pruning to attempt to improve the tree
 cv.class<-cv.tree(tree.class.train, K=10, FUN = prune.misclass)
@@ -195,6 +233,8 @@ table(test.y, pred.bag)
 mean(pred.bag != test.y)
 #mse down to .196, again much improved!
 
+plot(bag.class)
+text(bag.class, cex=0.75, pretty=0)
 #################################################
 ## Random Forest ##
 #################################################
@@ -216,3 +256,5 @@ pred.rf<-predict(rf.class, newdata=test, type = "response")
 table(test.y, pred.rf)
 mean(pred.rf != test.y)
 #.189 mse, even lower than bagging!
+plot(rf.class)
+text(rf.class, cex=0.75, pretty=0)
