@@ -1,6 +1,8 @@
 # ML-wines
 Machine Learning projects about wine data
-Questions of Interest
+
+Questions of Interest:
+
 (1)	How does the chemical makeup of a wine -- measured through fixed acidity, volatile acidity, citric acid, residual sugar, chlorides, free sulfur dioxide, 
 total sulfur dioxide, density, pH, sulphates, and alcohol content -- as well as an expert’s quality score of the wine, and type of wine, relate to the wine’s 
 alcohol content? (Regression)
